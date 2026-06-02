@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Générateur de Lettre de Motivation</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col justify-between font-sans">
 
     <header class="bg-indigo-600 text-white py-6 shadow-md text-center">
-        <h1 class="text-3xl font-bold tracking-tight">Générateur de Lettre de Motivation ✨</h1>
+        <h1 class="text-3xl font-bold tracking-tight">Générateur de Lettre de Motivation</h1>
         <p class="text-indigo-200 mt-2 font-medium">Créez une lettre personnalisée en quelques secondes</p>
     </header>
 
@@ -33,8 +34,182 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Votre CV (Format PDF)</label>
-                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-indigo-500 transition cursor-pointer bg-gray-50 relative">
-                        <div class="space-y-1 text-center">
+                    <div id="drop-zone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-indigo-500 transition-all duration-300 cursor-pointer bg-gray-50 relative">
+                        <div class="space-y-1 text-center" id="upload-context">
+                            <div id="upload-icon">
+                                <svg class="mx-auto h-12 w-12 text-gray-400 transition-transform duration-300" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20a4 4 0 004 4h24a4 4 0 004-4V20L28 8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                            <div class="flex text-sm text-gray-600 justify-center">
+                                <span id="upload-text" class="relative font-medium text-indigo-600">Choisir un fichier PDF</span>
+                            </div>
+                            <p class="text-xs text-gray-500" id="file-name">Aucun fichier sélectionné</p>
+                        </div>
+                        <input id="cvFile" type="file" accept=".pdf" class="absolute inset-0 opacity-0 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="generateLetter()" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition transform active:scale-95">
+                Générer ma lettre
+            </button>
+        </section>
+
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+            <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Votre lettre générée</h2>
+            
+            <div id="outputContainer" class="flex-grow border border-gray-200 rounded-lg p-4 bg-gray-50 overflow-y-auto whitespace-pre-line text-sm text-gray-700 leading-relaxed min-h-[300px]">
+                <span class="text-gray-400 italic">Remplissez le formulaire et cliquez sur "Générer" pour voir votre lettre apparaître ici...</span>
+            </div>
+
+            <button id="copyBtn" onclick="copyToClipboard()" class="mt-4 w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg transition opacity-50 cursor-not-allowed" disabled>
+                Copier le texte
+            </button>
+        </section>
+
+    </main>
+
+    <footer class="bg-gray-800 text-gray-400 text-center py-4 text-sm mt-8">
+        &copy; 2026 - Générateur de Lettre de Motivation | Hébergé sur Vercel
+    </footer>
+
+    <script>
+        // Configuration initiale du lecteur de PDF
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // Variables pour stocker l'identité trouvée
+        let identity = { firstName: "[Votre Prénom]", lastName: "[Votre Nom]" };
+
+        // Écouteur d'événement sur l'ajout du fichier
+        document.getElementById('cvFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 1. Animation et Verrouillage de l'interface
+            const dropZone = document.getElementById('drop-zone');
+            const uploadIcon = document.getElementById('upload-icon');
+            const uploadText = document.getElementById('upload-text');
+            const fileNameDisplay = document.getElementById('file-name');
+
+            fileNameDisplay.innerText = file.name;
+            
+            // Changement d'état visuel vers le mode "verrouillé" (couleur émeraude)
+            dropZone.classList.remove('bg-gray-50', 'hover:border-indigo-500');
+            dropZone.classList.add('bg-emerald-50', 'border-emerald-500', 'scale-102');
+            dropZone.style.pointerEvents = 'none'; // Rend la zone insensible au clic alternatif
+            
+            uploadText.innerHTML = "<span class='text-emerald-700 font-semibold'>Document validé et verrouillé</span>";
+            uploadIcon.innerHTML = `
+                <svg class="mx-auto h-12 w-12 text-emerald-600 transition-all duration-500 transform scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+            `;
+
+            this.disabled = true; // Désactive définitivement le champ d'entrée de fichier
+
+            // 2. Extraction du texte du PDF pour trouver le Nom / Prénom
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                
+                // On extrait le contenu de la première page (généralement là où se trouve l'entête du CV)
+                const page = await pdf.getPage(1);
+                const textContent = await page.getTextContent();
+                
+                // Nettoyage et filtrage des chaînes de caractères trouvées
+                const lines = textContent.items
+                    .map(item => item.str.trim())
+                    .filter(str => str.length > 0);
+
+                // Analyse des premières lignes pour identifier le nom
+                for (let i = 0; i < Math.min(lines.length, 12); i++) {
+                    let currentLine = lines[i];
+
+                    // On ignore les lignes contenant des données techniques, emails, liens ou numéros
+                    if (currentLine.includes('@') || 
+                        currentLine.includes('http') || 
+                        /^[0-9+\s().-]+$/.test(currentLine) || 
+                        currentLine.toLowerCase().includes('cv') || 
+                        currentLine.toLowerCase().includes('curriculum')) {
+                        continue;
+                    }
+
+                    // Un bloc de texte contenant 2 à 3 mots capitalisés est probablement le nom
+                    let words = currentLine.split(/\s+/);
+                    if (words.length >= 2 && words.length <= 3) {
+                        identity.firstName = words[0];
+                        identity.lastName = words.slice(1).join(' ');
+                        break; // Identité trouvée, on arrête la recherche
+                    }
+                }
+            } catch (error) {
+                console.error("Erreur lors de l'extraction des données du PDF :", error);
+                // En cas d'erreur de lecture, le programme conserve les valeurs génériques par défaut
+            }
+        });
+
+        // Fonction de génération de la lettre
+        function generateLetter() {
+            const jobTitle = document.getElementById('jobTitle').value.trim();
+            const companyName = document.getElementById('companyName').value.trim();
+
+            if (!jobTitle || !companyName) {
+                alert("Veuillez remplir l'intitulé du poste et le nom de l'entreprise.");
+                return;
+            }
+
+            const currentDate = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+            
+            // Génération du modèle de document personnalisé
+            const letterTemplate = `${identity.firstName} ${identity.lastName}
+[Adresse de contact]
+[Téléphone] / [Email]
+
+À l'attention de l'équipe de recrutement
+${companyName}
+
+Fait le ${currentDate}
+
+Objet : Candidature au poste de ${jobTitle}
+
+Madame, Monsieur,
+
+C’est avec un grand intérêt que j’ai pris connaissance de votre opportunité pour le poste de ${jobTitle} au sein de ${companyName}. Votre entreprise bénéficie d'une solide réputation dans son secteur, et c'est avec beaucoup d'enthousiasme que je vous propose ma candidature.
+
+Mon parcours et les compétences détaillées dans mon CV joint m'ont permis de développer une expertise solide directement transférable aux défis de ce poste. Intégrer ${companyName} représente pour moi l'opportunité de mettre mon dynamisme et ma rigueur au service de vos ambitions.
+
+Rigoureux(se), autonome et doté(e) d'un excellent esprit d'équipe, je suis convaincu(e) que ma motivation et ma capacité d'adaptation me permettront de m'intégrer rapidement et efficacement au sein de vos équipes.
+
+Je me tiens à votre entière disposition pour un entretien afin de vous exposer de vive voix mes motivations et d'échanger sur notre future collaboration.
+
+Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.
+
+${identity.firstName} ${identity.lastName}`;
+
+            // Affichage dans l'interface
+            const outputContainer = document.getElementById('outputContainer');
+            outputContainer.innerText = letterTemplate;
+            outputContainer.classList.remove('text-gray-400', 'italic');
+
+            // Activation du bouton d'action secondaire
+            const copyBtn = document.getElementById('copyBtn');
+            copyBtn.removeAttribute('disabled');
+            copyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // Fonction pour copier le texte
+        function copyToClipboard() {
+            const text = document.getElementById('outputContainer').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert("La lettre a été copiée dans votre presse-papiers.");
+            }).catch(err => {
+                console.error("Erreur lors de la copie : ", err);
+            });
+        }
+    </script>
+</body>
+</html>                        <div class="space-y-1 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
                                 <path d="M28 8H12a4 4 0 00-4 4v20a4 4 0 004 4h24a4 4 0 004-4V20L28 8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                             </svg>
