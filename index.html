@@ -40,7 +40,7 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Votre CV (Format PDF)</label>
-                    <div id="drop-zone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 relative">
+                    <div id="drop-zone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 relative hover:border-indigo-500 transition-all">
                         <div class="space-y-1 text-center" id="upload-context">
                             <div id="upload-icon">
                                 <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20a4 4 0 004 4h24a4 4 0 004-4V20L28 8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -68,7 +68,7 @@
                 </div>
 
                 <div>
-                    <label for="userSkills" class="block text-sm font-medium text-gray-700 mb-1">Compétences clés</label>
+                    <label substitution for="userSkills" class="block text-sm font-medium text-gray-700 mb-1">Compétences clés</label>
                     <textarea id="userSkills" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"></textarea>
                 </div>
 
@@ -117,9 +117,11 @@
             const file = e.target.files[0];
             if (!file) return;
 
+            // Changement visuel dynamique à chaque dépôt de fichier
             document.getElementById('file-name').innerText = file.name;
+            document.getElementById('drop-zone').classList.remove('bg-gray-50');
             document.getElementById('drop-zone').classList.add('bg-emerald-50', 'border-emerald-500');
-            document.getElementById('upload-text').innerHTML = "<span class='text-emerald-700 font-semibold'>CV mémorisé</span>";
+            document.getElementById('upload-text').innerHTML = "<span class='text-emerald-700 font-semibold'>Nouveau CV mémorisé !</span>";
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
@@ -132,16 +134,17 @@
                 }
                 fullCvText = extractedLines.join(" ");
                 
+                // Analyse et extraction automatique des informations du nouveau fichier
                 const words = extractedLines.filter(l => l.length > 2)[0]?.split(/\s+/) || [];
-                if(words[0]) document.getElementById('userFirstName').value = words[0];
-                if(words[1]) document.getElementById('userLastName').value = words.slice(1).join(' ');
-                document.getElementById('userSkills').value = "Données du CV correctement extraites en mémoire.";
+                document.getElementById('userFirstName').value = words[0] || "";
+                document.getElementById('userLastName').value = words.slice(1).join(' ') || "";
+                document.getElementById('userSkills').value = "Nouveau CV lu. Prêt pour l'analyse IA.";
             } catch (error) {
                 console.error(error);
+                document.getElementById('upload-text').innerHTML = "<span class='text-red-600 font-semibold'>Erreur de lecture du PDF</span>";
             }
         });
 
-        // Liaison du clic bouton à notre fonction module
         document.getElementById('generateBtn').addEventListener('click', generateLetter);
 
         async function generateLetter() {
@@ -160,7 +163,7 @@
             const outputContainer = document.getElementById('outputContainer');
             const generateBtn = document.getElementById('generateBtn');
             
-            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Le SDK Google prépare la connexion sécurisée... Rédaction en cours...</span>";
+            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Rédaction en cours via l'SDK officiel...</span>";
             generateBtn.disabled = true;
 
             if (!apiKey) {
@@ -170,10 +173,7 @@
             }
 
             try {
-                // Initialisation du SDK Google officiel avec votre clé
                 const ai = new GoogleGenAI({ apiKey: apiKey });
-                
-                // Appel au modèle de manière native (gère automatiquement les endpoints Europe)
                 const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
                 const prompt = `Agis en tant qu'expert en recrutement en France. Rédige une lettre de motivation professionnelle, percutante et hautement personnalisée en français, sans aucun émoji.
@@ -200,8 +200,7 @@
             } catch (error) {
                 outputContainer.innerHTML = `<div class="text-red-600 p-3 bg-red-50 rounded-lg border border-red-200">
                     <strong>Erreur détectée par le SDK Google :</strong><br>
-                    <code class="text-xs">${error.message}</code><br><br>
-                    <span class="text-xs text-gray-500">Si l'erreur parle d'une clé invalide, retournez sur AI Studio pour recréer une nouvelle clé propre.</span>
+                    <code class="text-xs">${error.message}</code>
                 </div>`;
             } finally {
                 generateBtn.disabled = false;
@@ -210,7 +209,6 @@
     </script>
     
     <script>
-        // Fonction globale de copie reste accessible au bouton classique HTML
         function copyToClipboard() {
             navigator.clipboard.writeText(document.getElementById('outputContainer').innerText).then(() => {
                 alert("Lettre copiée dans votre presse-papiers !");
