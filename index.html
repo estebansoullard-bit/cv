@@ -34,7 +34,8 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Votre CV (Format PDF)</label>
-                    <div id="drop-zone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-indigo-500 transition-all duration-300 cursor-pointer bg-gray-50">
+                    <div id="drop-zone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-indigo-500 transition-all duration-300 bg-gray-50 relative">
+                        
                         <div class="space-y-1 text-center" id="upload-context">
                             <div id="upload-icon">
                                 <svg class="mx-auto h-12 w-12 text-gray-400 transition-transform duration-300" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
@@ -42,12 +43,13 @@
                                 </svg>
                             </div>
                             <div class="flex text-sm text-gray-600 justify-center">
-                                <span id="upload-text" class="relative font-medium text-indigo-600">Choisir un fichier PDF</span>
+                                <span id="upload-text" class="relative font-medium text-indigo-600">Choisir ou glisser un fichier PDF</span>
                             </div>
                             <p class="text-xs text-gray-500" id="file-name">Aucun fichier sélectionné</p>
                         </div>
+
+                        <input id="cvFile" type="file" accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
                     </div>
-                    <input id="cvFile" type="file" accept=".pdf" class="hidden">
                 </div>
             </div>
 
@@ -75,40 +77,32 @@
     </footer>
 
     <script>
-        // Configuration initiale du lecteur de PDF
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        // Configuration sécurisée du lecteur de PDF
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        }
 
         // Variables pour stocker l'identité trouvée
         let identity = { firstName: "[Votre Prénom]", lastName: "[Votre Nom]" };
-        let isFileLoaded = false;
 
         const dropZone = document.getElementById('drop-zone');
         const cvFileInput = document.getElementById('cvFile');
 
-        // Déclenche le choix du fichier uniquement si aucun fichier n'est encore chargé
-        dropZone.addEventListener('click', function() {
-            if (!isFileLoaded) {
-                cvFileInput.click();
-            }
-        });
-
-        // Écouteur d'événement sur l'ajout du fichier
+        // Écouteur d'événement sur la sélection du fichier
         cvFileInput.addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            isFileLoaded = true;
-
-            // 1. Animation et Verrouillage de l'interface
+            // 1. Animation visuelle et Verrouillage immédiat
             const uploadIcon = document.getElementById('upload-icon');
             const uploadText = document.getElementById('upload-text');
             const fileNameDisplay = document.getElementById('file-name');
 
             fileNameDisplay.innerText = file.name;
             
-            // Changement d'état visuel vers le mode verrouillé
-            dropZone.classList.remove('bg-gray-50', 'hover:border-indigo-500', 'cursor-pointer');
-            dropZone.classList.add('bg-emerald-50', 'border-emerald-500', 'cursor-default');
+            // Passage de la zone parente au vert (mode validé)
+            dropZone.classList.remove('bg-gray-50', 'hover:border-indigo-500');
+            dropZone.classList.add('bg-emerald-50', 'border-emerald-500');
             
             uploadText.innerHTML = "<span class='text-emerald-700 font-semibold'>Document validé et verrouillé</span>";
             uploadIcon.innerHTML = `
@@ -117,11 +111,17 @@
                 </svg>
             `;
 
-            // 2. Extraction du texte du PDF pour trouver le Nom / Prénom
+            // Verrouillage technique : l'input invisible est désactivé et perd son curseur de clic
+            cvFileInput.disabled = true;
+            cvFileInput.classList.remove('cursor-pointer');
+            cvFileInput.classList.add('pointer-events-none');
+
+            // 2. Traitement du PDF en tâche de fond (sécurisé par un bloc try/catch)
             try {
+                if (typeof pdfjsLib === 'undefined') return;
+
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                
                 const page = await pdf.getPage(1);
                 const textContent = await page.getTextContent();
                 
@@ -129,7 +129,7 @@
                     .map(item => item.str.trim())
                     .filter(str => str.length > 0);
 
-                // Analyse des premières lignes pour identifier le nom
+                // Analyse des premières lignes textuelles pour extraire une identité plausible
                 for (let i = 0; i < Math.min(lines.length, 12); i++) {
                     let currentLine = lines[i];
 
@@ -149,7 +149,7 @@
                     }
                 }
             } catch (error) {
-                console.error("Erreur lors de l'extraction des données du PDF :", error);
+                console.error("Erreur d'extraction des métadonnées du PDF :", error);
             }
         });
 
@@ -182,4 +182,32 @@ C’est avec un grand intérêt que j’ai pris connaissance de votre opportunit
 
 Mon parcours et les compétences détaillées dans mon CV joint m'ont permis de développer une expertise solide directement transférable aux défis de ce poste. Intégrer ${companyName} représente pour moi l'opportunité de mettre mon dynamisme et ma rigueur au service de vos ambitions.
 
-Rigoureux(se), autonome et doté(e) d'un excellent esprit d'équipe, je suis convaincu(e) que ma motivation et
+Rigoureux(se), autonome et doté(e) d'un excellent esprit d'équipe, je suis convaincu(e) que ma motivation et ma capacité d'adaptation me permettront de m'intéregrer rapidement et efficacement au sein de vos équipes.
+
+Je me tiens à votre entière disposition pour un entretien afin de vous exposer de vive voix mes motivations et d'échanger sur notre future collaboration.
+
+Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.
+
+${identity.firstName} ${identity.lastName}`;
+
+            const outputContainer = document.getElementById('outputContainer');
+            outputContainer.innerText = letterTemplate;
+            outputContainer.classList.remove('text-gray-400', 'italic');
+
+            const copyBtn = document.getElementById('copyBtn');
+            copyBtn.removeAttribute('disabled');
+            copyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // Fonction pour copier le texte
+        function copyToClipboard() {
+            const text = document.getElementById('outputContainer').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert("La lettre a été copiée dans votre presse-papiers.");
+            }).catch(err => {
+                console.error("Erreur lors de la copie : ", err);
+            });
+        }
+    </script>
+</body>
+</html>
