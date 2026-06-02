@@ -6,6 +6,14 @@
     <title>Générateur de Lettre de Motivation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col justify-between font-sans">
 
@@ -72,7 +80,7 @@
                 </div>
             </div>
 
-            <button onclick="generateLetter()" id="generateBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition">
+            <button id="generateBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition">
                 Générer ma lettre avec Gemini
             </button>
         </section>
@@ -95,7 +103,9 @@
         &copy; 2026 - Générateur de Lettre de Motivation | Hébergé sur Vercel
     </footer>
 
-    <script>
+    <script type="module">
+        import { GoogleGenAI } from "@google/generative-ai";
+
         if (typeof pdfjsLib !== 'undefined') {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
         }
@@ -125,21 +135,14 @@
                 const words = extractedLines.filter(l => l.length > 2)[0]?.split(/\s+/) || [];
                 if(words[0]) document.getElementById('userFirstName').value = words[0];
                 if(words[1]) document.getElementById('userLastName').value = words.slice(1).join(' ');
-                document.getElementById('userSkills').value = "Données brutes lues avec succès.";
+                document.getElementById('userSkills').value = "Données du CV correctement extraites en mémoire.";
             } catch (error) {
                 console.error(error);
             }
         });
 
-        // Fonction d'appel HTTP réutilisable
-        async function callGeminiAPI(url, prompt) {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            });
-            return response;
-        }
+        // Liaison du clic bouton à notre fonction module
+        document.getElementById('generateBtn').addEventListener('click', generateLetter);
 
         async function generateLetter() {
             const jobTitle = document.getElementById('jobTitle').value.trim();
@@ -157,67 +160,60 @@
             const outputContainer = document.getElementById('outputContainer');
             const generateBtn = document.getElementById('generateBtn');
             
-            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Gemini analyse votre profil et rédige votre lettre...</span>";
+            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Le SDK Google prépare la connexion sécurisée... Rédaction en cours...</span>";
             generateBtn.disabled = true;
 
             if (!apiKey) {
-                outputContainer.innerText = "Veuillez coller votre clé API pour lancer la génération.";
+                outputContainer.innerText = "Veuillez insérer votre clé API Gemini.";
                 generateBtn.disabled = false;
                 return;
             }
 
-            const prompt = `Agis en tant qu'expert en recrutement en France. Rédige une lettre de motivation professionnelle, percutante et hautement personnalisée en français, sans aucun émoji.
-            Candidat: ${firstName} ${lastName}
-            Poste visé: ${jobTitle}
-            Entreprise ciblée: ${companyName}
-            Note sur les compétences: ${skills}
-            Contenu complet du CV pour adapter précisément tes arguments : ${fullCvText}
-            
-            Rends la lettre complète avec une mise en page formelle française (En-tête, Objet, Structure fluide Vous/Je/Nous, Salutations distinguées).`;
+            try {
+                // Initialisation du SDK Google officiel avec votre clé
+                const ai = new GoogleGenAI({ apiKey: apiKey });
+                
+                // Appel au modèle de manière native (gère automatiquement les endpoints Europe)
+                const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-            // Liste des URLs d'endpoints ordonnées du plus probable au secours
-            const endpoints = [
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
-                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
-            ];
+                const prompt = `Agis en tant qu'expert en recrutement en France. Rédige une lettre de motivation professionnelle, percutante et hautement personnalisée en français, sans aucun émoji.
+                Candidat: ${firstName} ${lastName}
+                Poste visé: ${jobTitle}
+                Entreprise ciblée: ${companyName}
+                Compétences prioritaires: ${skills}
+                Contenu complet de mon CV pour adapter précisément tes arguments : ${fullCvText}
+                
+                Rédige la lettre complète (En-tête classique français, Objet, Structure structurée Vous/Je/Nous valorisant les vraies expériences lues dans le CV, Salutations distinguées).`;
 
-            let success = false;
-            let lastErrorLog = "";
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
 
-            for (let i = 0; i < endpoints.length; i++) {
-                try {
-                    const response = await callGeminiAPI(endpoints[i], prompt);
-                    const data = await response.json();
-
-                    if (!data.error && data.candidates && data.candidates[0].content.parts[0].text) {
-                        outputContainer.innerText = data.candidates[0].content.parts[0].text;
-                        document.getElementById('copyBtn').removeAttribute('disabled');
-                        document.getElementById('copyBtn').classList.remove('opacity-50', 'cursor-not-allowed');
-                        success = true;
-                        break; // On a réussi, on sort de la boucle !
-                    } else if (data.error) {
-                        lastErrorLog = `Tentative ${i+1} (${data.error.code}) : ${data.error.message}`;
-                    }
-                } catch (err) {
-                    lastErrorLog = `Tentative ${i+1} Échec réseau : ${err.message}`;
+                if (text) {
+                    outputContainer.innerText = text;
+                    document.getElementById('copyBtn').removeAttribute('disabled');
+                    document.getElementById('copyBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                    outputContainer.innerText = "L'IA a retourné un contenu vide. Réessayez.";
                 }
-            }
 
-            if (!success) {
+            } catch (error) {
                 outputContainer.innerHTML = `<div class="text-red-600 p-3 bg-red-50 rounded-lg border border-red-200">
-                    <strong>Erreur de configuration des serveurs Google :</strong><br>
-                    <p class="text-sm my-2">Les 3 protocoles de connexion ont échoué. Cela signifie généralement que la clé API générée est active mais n'a pas encore été synchronisée sur la zone Europe par Google.</p>
-                    <code class="text-xs text-gray-500">${lastErrorLog}</code>
+                    <strong>Erreur détectée par le SDK Google :</strong><br>
+                    <code class="text-xs">${error.message}</code><br><br>
+                    <span class="text-xs text-gray-500">Si l'erreur parle d'une clé invalide, retournez sur AI Studio pour recréer une nouvelle clé propre.</span>
                 </div>`;
+            } finally {
+                generateBtn.disabled = false;
             }
-
-            generateBtn.disabled = false;
         }
-
+    </script>
+    
+    <script>
+        // Fonction globale de copie reste accessible au bouton classique HTML
         function copyToClipboard() {
             navigator.clipboard.writeText(document.getElementById('outputContainer').innerText).then(() => {
-                alert("Lettre copiée !");
+                alert("Lettre copiée dans votre presse-papiers !");
             });
         }
     </script>
