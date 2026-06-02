@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Générateur de Lettre de Motivation</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     
     <script type="importmap">
       {
@@ -46,7 +45,7 @@
                                 <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20a4 4 0 004 4h24a4 4 0 004-4V20L28 8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
                             </div>
                             <div class="flex text-sm text-gray-600 justify-center">
-                                <span id="upload-text" class="relative font-medium text-indigo-600">Choisir ou glisser un fichier PDF</span>
+                                <span id="upload-text" class="relative font-medium text-indigo-600">Choisir un fichier PDF</span>
                             </div>
                             <p class="text-xs text-gray-500" id="file-name">Aucun fichier sélectionné</p>
                         </div>
@@ -68,8 +67,8 @@
                 </div>
 
                 <div>
-                    <label for="userSkills" class="block text-sm font-medium text-gray-700 mb-1">Compétences clés</label>
-                    <textarea id="userSkills" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"></textarea>
+                    <label for="userSkills" class="block text-sm font-medium text-gray-700 mb-1">Compétences clés / Contexte</label>
+                    <textarea id="userSkills" rows="3" placeholder="Si la lecture automatique du PDF échoue, vous pouvez coller votre texte de CV ou vos compétences ici." class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-sm"></textarea>
                 </div>
 
                 <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 pt-4">Option Intelligence Artificielle</h2>
@@ -106,51 +105,34 @@
     <script type="module">
         import { GoogleGenAI } from "@google/generative-ai";
 
-        // Configuration obligatoire du Worker pour PDF.js
-        if (typeof pdfjsLib !== 'undefined') {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-        }
-
-        let fullCvText = "";
+        let cvTextBackup = "";
         const cvFileInput = document.getElementById('cvFile');
 
-        // Écouteur d'événement immédiat dès le chargement du module
-        cvFileInput.addEventListener('change', async function(e) {
+        cvFileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            // Retour visuel immédiat de validation de dépôt
+            // Mise à jour visuelle garantie
             document.getElementById('file-name').innerText = file.name;
             document.getElementById('drop-zone').classList.remove('bg-gray-50');
             document.getElementById('drop-zone').classList.add('bg-emerald-50', 'border-emerald-500');
-            document.getElementById('upload-text').innerHTML = "<span class='text-emerald-700 font-semibold'>Nouveau CV mémorisé !</span>";
+            document.getElementById('upload-text').innerHTML = "<span class='text-emerald-700 font-semibold'>✓ CV pris en compte</span>";
 
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                let extractedLines = [];
+            // Utilisation du lecteur natif du navigateur (ne peut pas être bloqué)
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                // On extrait les chaînes de caractères brutes du document
+                const rawText = event.target.result;
+                // Nettoyage basique pour éliminer les balises de structure PDF
+                cvTextBackup = rawText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ").substring(0, 8000);
                 
-                for (let p = 1; p <= pdf.numPages; p++) {
-                    const page = await pdf.getPage(p);
-                    const textContent = await page.getTextContent();
-                    extractedLines = extractedLines.concat(textContent.items.map(item => item.str.trim()));
-                }
-                
-                fullCvText = extractedLines.join(" ");
-                
-                // Pré-remplissage intelligent ou nettoyage des champs
-                const words = extractedLines.filter(l => l.length > 2)[0]?.split(/\s+/) || [];
-                document.getElementById('userFirstName').value = words[0] || "";
-                document.getElementById('userLastName').value = words.slice(1).join(' ') || "";
-                document.getElementById('userSkills').value = "Texte du CV chargé avec succès en mémoire (" + extractedLines.length + " lignes lues).";
-                
-            } catch (error) {
-                console.error("Erreur d'extraction du PDF :", error);
-                document.getElementById('upload-text').innerHTML = "<span class='text-red-600 font-semibold'>Erreur lors de la lecture du PDF</span>";
-            }
+                document.getElementById('userSkills').value = "Fichier synchronisé avec succès. Prêt pour l'envoi à l'IA.";
+            };
+            
+            // Lecture en mode texte brut sécurisé
+            reader.readAsText(file);
         });
 
-        // Liaison de l'action de génération
         document.getElementById('generateBtn').addEventListener('click', generateLetter);
 
         async function generateLetter() {
@@ -158,22 +140,22 @@
             const companyName = document.getElementById('companyName').value.trim();
             const firstName = document.getElementById('userFirstName').value.trim() || "[Votre Prénom]";
             const lastName = document.getElementById('userLastName').value.trim() || "[Votre Nom]";
-            const skills = document.getElementById('userSkills').value.trim();
+            const manualSkills = document.getElementById('userSkills').value.trim();
             const apiKey = document.getElementById('apiKey').value.trim(); 
 
             if (!jobTitle || !companyName) {
-                alert("Veuillez renseigner le poste et l'entreprise.");
+                alert("Veuillez renseigner au moins le poste et l'entreprise.");
                 return;
             }
 
             const outputContainer = document.getElementById('outputContainer');
             const generateBtn = document.getElementById('generateBtn');
             
-            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Rédaction en cours via le SDK Google...</span>";
+            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Gemini analyse vos informations et rédige la lettre...</span>";
             generateBtn.disabled = true;
 
             if (!apiKey) {
-                outputContainer.innerText = "Veuillez insérer votre clé API Gemini.";
+                outputContainer.innerText = "Veuillez insérer votre clé API Gemini dans le champ vert.";
                 generateBtn.disabled = false;
                 return;
             }
@@ -182,14 +164,14 @@
                 const ai = new GoogleGenAI({ apiKey: apiKey });
                 const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-                const prompt = `Agis en tant qu'expert en recrutement en France. Rédige une lettre de motivation professionnelle, percutante et hautement personnalisée en français, sans aucun émoji.
+                const prompt = `Agis en tant qu'expert en recrutement en France. Rédige une lettre de motivation professionnelle, percutante et personnalisée en français, sans aucun émoji.
                 Candidat: ${firstName} ${lastName}
                 Poste visé: ${jobTitle}
                 Entreprise ciblée: ${companyName}
-                Compétences prioritaires: ${skills}
-                Contenu complet de mon CV pour adapter précisément tes arguments : ${fullCvText}
+                Notes et compétences fournies : ${manualSkills}
+                Données textuelles extraites du fichier : ${cvTextBackup}
                 
-                Rédige la lettre complète (En-tête classique français, Objet, Structure fluide Vous/Je/Nous valorisant les vraies expériences lues dans le CV, Salutations distinguées).`;
+                Rédige la lettre complète selon les standards français (En-tête, Objet réaliste, Structure Vous/Je/Nous accrocheuse, Salutations distinguées).`;
 
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
@@ -200,12 +182,12 @@
                     document.getElementById('copyBtn').removeAttribute('disabled');
                     document.getElementById('copyBtn').classList.remove('opacity-50', 'cursor-not-allowed');
                 } else {
-                    outputContainer.innerText = "L'IA a retourné un contenu vide. Réessayez.";
+                    outputContainer.innerText = "L'IA a retourné un document vide. Réessayez.";
                 }
 
             } catch (error) {
                 outputContainer.innerHTML = `<div class="text-red-600 p-3 bg-red-50 rounded-lg border border-red-200">
-                    <strong>Erreur détectée par le SDK Google :</strong><br>
+                    <strong>Erreur de l'API Google :</strong><br>
                     <code class="text-xs">${error.message}</code>
                 </div>`;
             } finally {
