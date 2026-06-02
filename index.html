@@ -5,20 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Générateur de Lettre de Motivation</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <script type="importmap">
-      {
-        "imports": {
-          "@google/generative-ai": "https://esm.run/@google/generative-ai"
-        }
-      }
-    </script>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col justify-between font-sans">
 
     <header class="bg-indigo-600 text-white py-6 shadow-md text-center">
         <h1 class="text-3xl font-bold tracking-tight">Générateur de Lettre de Motivation</h1>
-        <p class="text-indigo-200 mt-2 font-medium">Zéro blocage, génération instantanée</p>
+        <p class="text-indigo-200 mt-2 font-medium">Connexion directe et instantanée</p>
     </header>
 
     <main class="max-w-5xl w-full mx-auto p-4 md:p-8 flex-grow grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -41,8 +33,8 @@
                 <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 pt-2">2. Votre CV (Contenu textuel)</h2>
                 
                 <div>
-                    <label for="cvContent" class="block text-sm font-medium text-gray-700 mb-1">Ouvrez votre CV, copiez tout le texte et collez-le ci-dessous *</label>
-                    <textarea id="cvContent" rows="8" placeholder="Ex: \nJEAN DUPONT \nExpérience : 2 ans chez... \nCompétences : Vente, Négociation..." class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono bg-gray-50 focus:bg-white transition-all"></textarea>
+                    <label for="cvContent" class="block text-sm font-medium text-gray-700 mb-1">Ouvrez votre CV, copiez tout son texte (Ctrl+A / Ctrl+C) et collez-le ici *</label>
+                    <textarea id="cvContent" rows="8" placeholder="Collez le texte de votre CV ici..." class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono bg-gray-50 focus:bg-white transition-all"></textarea>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
@@ -56,7 +48,7 @@
                     </div>
                 </div>
 
-                <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 pt-2">3. Sécurité</h2>
+                <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 pt-2">3. Paramètres de l'IA</h2>
                 
                 <div>
                     <label for="apiKey" class="block text-sm font-medium text-emerald-700 font-semibold mb-1">Votre clé API Gemini</label>
@@ -64,7 +56,7 @@
                 </div>
             </div>
 
-            <button id="generateBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition mt-4">
+            <button onclick="generateLetter()" id="generateBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition mt-4">
                 Rédiger ma lettre de motivation
             </button>
         </section>
@@ -73,7 +65,7 @@
             <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Votre lettre générée</h2>
             
             <div id="outputContainer" class="flex-grow border border-gray-200 rounded-lg p-4 bg-gray-50 overflow-y-auto whitespace-pre-line text-sm text-gray-700 leading-relaxed min-h-[420px]">
-                <span class="text-gray-400 italic">Remplissez les champs à gauche et cliquez sur le bouton pour lancer l'IA...</span>
+                <span class="text-gray-400 italic">Remplissez les champs à gauche, puis cliquez sur le bouton pour lancer la rédaction...</span>
             </div>
 
             <button id="copyBtn" onclick="copyToClipboard()" class="mt-4 w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg transition opacity-50 cursor-not-allowed" disabled>
@@ -87,254 +79,8 @@
         &copy; 2026 - Assistant Recrutement Personnel
     </footer>
 
-    <script type="module">
-        import { GoogleGenAI } from "@google/generative-ai";
-
-        document.getElementById('generateBtn').addEventListener('click', generateLetter);
-
+    <script>
         async function generateLetter() {
             const jobTitle = document.getElementById('jobTitle').value.trim();
             const companyName = document.getElementById('companyName').value.trim();
             const cvText = document.getElementById('cvContent').value.trim();
-            const apiKey = document.getElementById('apiKey').value.trim(); 
-            
-            const firstName = document.getElementById('userFirstName').value.trim() || "[Votre Prénom]";
-            const lastName = document.getElementById('userLastName').value.trim() || "[Votre Nom]";
-
-            // Vérifications basiques
-            if (!jobTitle || !companyName) {
-                alert("Erreur : Veuillez renseigner le poste et l'entreprise visée.");
-                return;
-            }
-            if (!cvText) {
-                alert("Erreur : Veuillez copier et coller le texte de votre CV dans la grande zone prévue.");
-                return;
-            }
-            if (!apiKey) {
-                alert("Erreur : N'oubliez pas de coller votre clé API Gemini dans la case verte.");
-                return;
-            }
-
-            const outputContainer = document.getElementById('outputContainer');
-            const generateBtn = document.getElementById('generateBtn');
-            
-            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Connexion directe établie. Rdaction de la lettre en cours...</span>";
-            generateBtn.disabled = true;
-
-            try {
-                // Connexion au modèle via la clé fournie
-                const ai = new GoogleGenAI({ apiKey: apiKey });
-                const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-                const prompt = `Agis en tant qu'expert en recrutement en France. Rédige une lettre de motivation professionnelle, captivante et hautement personnalisée en français, sans aucun émoji.
-                Informations du candidat : ${firstName} ${lastName}
-                Poste ciblé : ${jobTitle}
-                Entreprise : ${companyName}
-                Voici l'intégralité du texte de mon CV pour que tu puisses lier mes expériences réelles aux besoins du poste : 
-                ${cvText}
-                
-                Rédige une structure complète et élégante (En-tête, Objet formel, Corps de texte fluide articulé autour du Vous/Je/Nous, et formules de politesse de fin).`;
-
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                const text = response.text();
-
-                if (text) {
-                    outputContainer.innerText = text;
-                    document.getElementById('copyBtn').removeAttribute('disabled');
-                    document.getElementById('copyBtn').classList.remove('opacity-50', 'cursor-not-allowed');
-                } else {
-                    outputContainer.innerText = "L'API a répondu mais le texte généré est vide. Réessayez.";
-                }
-
-            } catch (error) {
-                outputContainer.innerHTML = `<div class="text-red-600 p-3 bg-red-50 rounded-lg border border-red-200">
-                    <strong>Erreur de l'IA :</strong><br>
-                    <code class="text-xs">${error.message}</code><br><br>
-                    <span class="text-xs text-gray-500">Si le message parle d'une clé invalide, générez-en une nouvelle sur votre espace Google AI Studio.</span>
-                </div>`;
-            } finally {
-                generateBtn.disabled = false;
-            }
-        }
-    </script>
-    
-    <script>
-        function copyToClipboard() {
-            navigator.clipboard.writeText(document.getElementById('outputContainer').innerText).then(() => {
-                alert("Lettre copiée dans votre presse-papiers !");
-            });
-        }
-    </script>
-</body>
-</html>                    <input type="text" id="companyName" placeholder="Ex: Vercel Inc." class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Votre CV (Format PDF)</label>
-                    <div id="drop-zone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 relative hover:border-indigo-500 transition-all">
-                        <div class="space-y-1 text-center" id="upload-context">
-                            <div id="upload-icon">
-                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20a4 4 0 004 4h24a4 4 0 004-4V20L28 8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                            </div>
-                            <div class="flex text-sm text-gray-600 justify-center">
-                                <span id="upload-text" class="relative font-medium text-indigo-600">Choisir un fichier PDF</span>
-                            </div>
-                            <p class="text-xs text-gray-500" id="file-name">Aucun fichier sélectionné</p>
-                        </div>
-                        <input id="cvFile" type="file" accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                    </div>
-                </div>
-
-                <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 pt-4">Données du CV (Modifiables)</h2>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="userFirstName" class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                        <input type="text" id="userFirstName" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                    </div>
-                    <div>
-                        <label for="userLastName" class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                        <input type="text" id="userLastName" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                    </div>
-                </div>
-
-                <div>
-                    <label for="userSkills" class="block text-sm font-medium text-gray-700 mb-1">Compétences clés / Contexte</label>
-                    <textarea id="userSkills" rows="3" placeholder="Si la lecture automatique du PDF échoue, vous pouvez coller votre texte de CV ou vos compétences ici." class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-sm"></textarea>
-                </div>
-
-                <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 pt-4">Option Intelligence Artificielle</h2>
-                
-                <div>
-                    <label for="apiKey" class="block text-sm font-medium text-gray-700 mb-1 text-emerald-700 font-semibold">Clé API Gemini active</label>
-                    <input type="text" id="apiKey" placeholder="Collez votre clé AIzaSy... ici" class="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs bg-emerald-50">
-                </div>
-            </div>
-
-            <button id="generateBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition">
-                Générer ma lettre avec Gemini
-            </button>
-        </section>
-
-        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-            <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Votre lettre générée</h2>
-            
-            <div id="outputContainer" class="flex-grow border border-gray-200 rounded-lg p-4 bg-gray-50 overflow-y-auto whitespace-pre-line text-sm text-gray-700 leading-relaxed min-h-[400px]">
-                <span class="text-gray-400 italic">En attente des données...</span>
-            </div>
-
-            <button id="copyBtn" onclick="copyToClipboard()" class="mt-4 w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg transition opacity-50 cursor-not-allowed" disabled>
-                Copier le texte
-            </button>
-        </section>
-
-    </main>
-
-    <footer class="bg-gray-800 text-gray-400 text-center py-4 text-sm mt-8">
-        &copy; 2026 - Générateur de Lettre de Motivation | Hébergé sur Vercel
-    </footer>
-
-    <script type="module">
-        import { GoogleGenAI } from "@google/generative-ai";
-
-        let cvTextBackup = "";
-        const cvFileInput = document.getElementById('cvFile');
-
-        cvFileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            // Mise à jour visuelle garantie
-            document.getElementById('file-name').innerText = file.name;
-            document.getElementById('drop-zone').classList.remove('bg-gray-50');
-            document.getElementById('drop-zone').classList.add('bg-emerald-50', 'border-emerald-500');
-            document.getElementById('upload-text').innerHTML = "<span class='text-emerald-700 font-semibold'>✓ CV pris en compte</span>";
-
-            // Utilisation du lecteur natif du navigateur (ne peut pas être bloqué)
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                // On extrait les chaînes de caractères brutes du document
-                const rawText = event.target.result;
-                // Nettoyage basique pour éliminer les balises de structure PDF
-                cvTextBackup = rawText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ").substring(0, 8000);
-                
-                document.getElementById('userSkills').value = "Fichier synchronisé avec succès. Prêt pour l'envoi à l'IA.";
-            };
-            
-            // Lecture en mode texte brut sécurisé
-            reader.readAsText(file);
-        });
-
-        document.getElementById('generateBtn').addEventListener('click', generateLetter);
-
-        async function generateLetter() {
-            const jobTitle = document.getElementById('jobTitle').value.trim();
-            const companyName = document.getElementById('companyName').value.trim();
-            const firstName = document.getElementById('userFirstName').value.trim() || "[Votre Prénom]";
-            const lastName = document.getElementById('userLastName').value.trim() || "[Votre Nom]";
-            const manualSkills = document.getElementById('userSkills').value.trim();
-            const apiKey = document.getElementById('apiKey').value.trim(); 
-
-            if (!jobTitle || !companyName) {
-                alert("Veuillez renseigner au moins le poste et l'entreprise.");
-                return;
-            }
-
-            const outputContainer = document.getElementById('outputContainer');
-            const generateBtn = document.getElementById('generateBtn');
-            
-            outputContainer.innerHTML = "<span class='text-indigo-600 font-medium animate-pulse'>🤖 Gemini analyse vos informations et rédige la lettre...</span>";
-            generateBtn.disabled = true;
-
-            if (!apiKey) {
-                outputContainer.innerText = "Veuillez insérer votre clé API Gemini dans le champ vert.";
-                generateBtn.disabled = false;
-                return;
-            }
-
-            try {
-                const ai = new GoogleGenAI({ apiKey: apiKey });
-                const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-                const prompt = `Agis en tant qu'expert en recrutement en France. Rédige une lettre de motivation professionnelle, percutante et personnalisée en français, sans aucun émoji.
-                Candidat: ${firstName} ${lastName}
-                Poste visé: ${jobTitle}
-                Entreprise ciblée: ${companyName}
-                Notes et compétences fournies : ${manualSkills}
-                Données textuelles extraites du fichier : ${cvTextBackup}
-                
-                Rédige la lettre complète selon les standards français (En-tête, Objet réaliste, Structure Vous/Je/Nous accrocheuse, Salutations distinguées).`;
-
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                const text = response.text();
-
-                if (text) {
-                    outputContainer.innerText = text;
-                    document.getElementById('copyBtn').removeAttribute('disabled');
-                    document.getElementById('copyBtn').classList.remove('opacity-50', 'cursor-not-allowed');
-                } else {
-                    outputContainer.innerText = "L'IA a retourné un document vide. Réessayez.";
-                }
-
-            } catch (error) {
-                outputContainer.innerHTML = `<div class="text-red-600 p-3 bg-red-50 rounded-lg border border-red-200">
-                    <strong>Erreur de l'API Google :</strong><br>
-                    <code class="text-xs">${error.message}</code>
-                </div>`;
-            } finally {
-                generateBtn.disabled = false;
-            }
-        }
-    </script>
-    
-    <script>
-        function copyToClipboard() {
-            navigator.clipboard.writeText(document.getElementById('outputContainer').innerText).then(() => {
-                alert("Lettre copiée !");
-            });
-        }
-    </script>
-</body>
-</html>
